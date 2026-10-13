@@ -1,6 +1,12 @@
 package com.example.crucibleintelligencesmsapp.ui.chat
 
+import android.content.Context
+import android.content.Intent
+import android.media.MediaPlayer
+import android.net.Uri
 import android.widget.Toast
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -12,11 +18,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Analytics
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.HelpOutline
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PriorityHigh
 import androidx.compose.material.icons.rounded.Psychology
+import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,12 +46,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.crucibleintelligencesmsapp.data.EntityProfile
 import com.example.crucibleintelligencesmsapp.data.repository.SmsMessage
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.absoluteValue
+import kotlin.math.sin
 
-@Suppress("DEPRECATION")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DossierIntelligenceBottomSheet(
@@ -45,7 +63,9 @@ fun DossierIntelligenceBottomSheet(
     address: String,
     profile: EntityProfile?,
     messages: List<SmsMessage>,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onSaveNotes: ((String) -> Unit)? = null,
+    onInjectScript: ((String) -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
@@ -293,7 +313,18 @@ fun DossierIntelligenceBottomSheet(
                 }
             }
 
-            // 3. AI / Keyword Analysis POC
+            // 3. Voice Note / Audio Playback
+            Text(
+                text = "VOICE NOTE INTELLIGENCE",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 1.sp
+            )
+
+            DossierVoiceNotePlayer(context = context)
+
+            // 4. AI / Keyword Analysis POC
             Text(
                 text = "AI / KEYWORD ANALYSIS POC",
                 style = MaterialTheme.typography.labelLarge,
@@ -405,59 +436,248 @@ fun DossierIntelligenceBottomSheet(
                 }
             }
 
-            // 4. "Generate Intelligence Dossier" Button & Brief Card
-            Button(
-                onClick = {
-                    isGenerating = true
-                    val reportId = (address.hashCode().absoluteValue % 900000 + 100000)
-                    val reportDate = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+            // 5. Manual Context Feedback Box
+            Text(
+                text = "MANUAL DOSSIER INTELLIGENCE",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 1.sp
+            )
 
-                    generatedReportText = """
-                        ===================================================
-                        CRUCIBLE DOSSIER INTELLIGENCE REPORT
-                        ===================================================
-                        REPORT ID  : #CDR-$reportId
-                        DATE       : $reportDate
-                        SUBJECT    : $displayTitle
-                        ADDRESS    : $address
-                        ---------------------------------------------------
-                        INTERACTION SUMMARY:
-                        - Total Exchanges : $totalMessages
-                        - Incoming        : $incomingCount
-                        - Outgoing        : $outgoingCount
-                        - First Contact   : $firstContactStr
-                        - Latest Contact  : $latestContactStr
-                        
-                        INTELLIGENCE ANALYSIS:
-                        - Detected Themes : ${themes.joinToString(", ")}
-                        - Sentiment Gauge : $sentiment
-                        - Threat Risk     : Low Risk
-                        
-                        ASSESSMENT BRIEF:
-                        Subject ($displayTitle) maintains an active communication link.
-                        Exchanges demonstrate normal operational messaging patterns.
-                        No threat indicators or security anomalies detected.
-                        ===================================================
-                    """.trimIndent()
-                    isGenerating = false
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp)
+            var manualNotes by remember(profile) { mutableStateOf(profile?.notes ?: "") }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                ),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.AutoAwesome,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = manualNotes,
+                        onValueChange = { manualNotes = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Custom Background Notes & Context") },
+                        placeholder = { Text("Add manual intelligence background notes for this contact...") },
+                        minLines = 3,
+                        maxLines = 5,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    Button(
+                        onClick = {
+                            onSaveNotes?.invoke(manualNotes)
+                            Toast.makeText(context, "Manual context note saved to profile", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.align(Alignment.End),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Save,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Save Intelligence Note")
+                    }
+                }
+            }
+
+            // 6. "Execute Script" AI Response Injector Menu
+            Text(
+                text = "EXECUTE AI RESPONSE SCRIPT",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 1.sp
+            )
+
+            Text(
+                text = "Select a quick AI script to inject directly into the composer input field:",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            val scripts = listOf(
+                Triple(
+                    "Draft Formal Reply",
+                    Icons.Rounded.Description,
+                    "Dear $displayTitle,\n\nThank you for reaching out. I have reviewed the details and will proceed accordingly.\n\nBest regards,"
+                ),
+                Triple(
+                    "Request Clarification",
+                    Icons.Rounded.HelpOutline,
+                    "Could you please provide additional details or clarification regarding your previous message? Standing by for your update."
+                ),
+                Triple(
+                    "Acknowledge & Confirm",
+                    Icons.Rounded.CheckCircleOutline,
+                    "Acknowledged and confirmed. Proceeding with the requested action immediately."
+                ),
+                Triple(
+                    "Escalate Priority",
+                    Icons.Rounded.PriorityHigh,
+                    "CRITICAL UPDATE: Priority level escalated for this thread. Immediate review in progress."
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Generate Intelligence Dossier", fontWeight = FontWeight.Bold)
+            )
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                scripts.forEach { (title, icon, text) ->
+                    OutlinedCard(
+                        onClick = {
+                            onInjectScript?.invoke(text)
+                            Toast.makeText(context, "Injected '$title' into composer", Toast.LENGTH_SHORT).show()
+                            onDismiss()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.outlinedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = CircleShape,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (text.length > 60) text.take(60) + "..." else text,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 7. Generate & Export/Share Dossier Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        isGenerating = true
+                        val reportId = (address.hashCode().absoluteValue % 900000 + 100000)
+                        val reportDate = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+
+                        generatedReportText = """
+                            ===================================================
+                            CRUCIBLE DOSSIER INTELLIGENCE REPORT
+                            ===================================================
+                            REPORT ID  : #CDR-$reportId
+                            DATE       : $reportDate
+                            SUBJECT    : $displayTitle
+                            ADDRESS    : $address
+                            ---------------------------------------------------
+                            INTERACTION SUMMARY:
+                            - Total Exchanges : $totalMessages
+                            - Incoming        : $incomingCount
+                            - Outgoing        : $outgoingCount
+                            - First Contact   : $firstContactStr
+                            - Latest Contact  : $latestContactStr
+                            
+                            INTELLIGENCE ANALYSIS:
+                            - Detected Themes : ${themes.joinToString(", ")}
+                            - Sentiment Gauge : $sentiment
+                            - Threat Risk     : Low Risk
+                            
+                            MANUAL NOTES:
+                            ${if (manualNotes.isNotBlank()) manualNotes else "None recorded."}
+                            
+                            ASSESSMENT BRIEF:
+                            Subject ($displayTitle) maintains an active communication link.
+                            Exchanges demonstrate normal operational messaging patterns.
+                            No threat indicators or security anomalies detected.
+                            ===================================================
+                        """.trimIndent()
+                        isGenerating = false
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.AutoAwesome,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Generate Dossier", fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        val reportId = (address.hashCode().absoluteValue % 900000 + 100000)
+                        val reportDate = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+                        val reportToShare = generatedReportText ?: """
+                            CRUCIBLE DOSSIER BRIEF: $displayTitle ($address)
+                            Date: $reportDate (Ref #CDR-$reportId)
+                            Exchanges: $totalMessages ($incomingCount IN / $outgoingCount OUT)
+                            Themes: ${themes.joinToString(", ")}
+                            Sentiment: $sentiment
+                            Manual Notes: ${if (manualNotes.isNotBlank()) manualNotes else "N/A"}
+                        """.trimIndent()
+
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, "Crucible Dossier Brief: $displayTitle")
+                            putExtra(Intent.EXTRA_TEXT, reportToShare)
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "Share Dossier Brief"))
+                    },
+                    modifier = Modifier.height(50.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Share,
+                        contentDescription = "Export / Share Dossier"
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Share")
+                }
             }
 
             if (isGenerating) {
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
@@ -522,30 +742,274 @@ fun DossierIntelligenceBottomSheet(
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
-                        Button(
-                            onClick = {
-                                clipboardManager.setText(AnnotatedString(reportText))
-                                Toast.makeText(context, "Intelligence Dossier copied to clipboard", Toast.LENGTH_SHORT).show()
-                            },
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.ContentCopy,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Copy Intelligence Brief")
+                            Button(
+                                onClick = {
+                                    clipboardManager.setText(AnnotatedString(reportText))
+                                    Toast.makeText(context, "Intelligence Dossier copied to clipboard", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.ContentCopy,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Copy Brief")
+                            }
+
+                            Button(
+                                onClick = {
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_SUBJECT, "Crucible Dossier Brief: $displayTitle")
+                                        putExtra(Intent.EXTRA_TEXT, reportText)
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, "Share Dossier Brief"))
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Share,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Export / Share")
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+fun DossierVoiceNotePlayer(context: Context) {
+    var isPlaying by remember { mutableStateOf(false) }
+    var currentPositionMs by remember { mutableFloatStateOf(0f) }
+    val totalDurationMs = 30000f
+
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+
+    DisposableEffect(context) {
+        val audioFile = getOrCreateSampleAudioFile(context)
+        val player = try {
+            MediaPlayer.create(context, Uri.fromFile(audioFile))?.apply {
+                isLooping = true
+            }
+        } catch (e: Exception) {
+            null
+        }
+        mediaPlayer = player
+
+        onDispose {
+            player?.stop()
+            player?.release()
+        }
+    }
+
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            mediaPlayer?.start()
+            while (isActive && isPlaying) {
+                delay(100)
+                currentPositionMs = (currentPositionMs + 100f) % totalDurationMs
+            }
+        } else {
+            mediaPlayer?.pause()
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Mic,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Column {
+                    Text(
+                        text = "Dossier Voice Briefing #042",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Recorded Audio Intelligence",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Audio Waveform Visualization
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(36.dp)
+                    .background(
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                        RoundedCornerShape(8.dp)
+                    )
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                val barCount = 20
+                for (i in 0 until barCount) {
+                    val baseHeight = if (i % 3 == 0) 24f else if (i % 2 == 0) 16f else 10f
+                    val animatedFactor = if (isPlaying) {
+                        (sin((currentPositionMs / 200f) + i) * 8f + 12f).coerceIn(4f, 28f)
+                    } else {
+                        baseHeight
+                    }
+                    val heightDp by animateFloatAsState(
+                        targetValue = animatedFactor,
+                        animationSpec = tween(durationMillis = 100),
+                        label = "waveform"
+                    )
+
+                    val isPlayed = (i.toFloat() / barCount) <= (currentPositionMs / totalDurationMs)
+                    val barColor = if (isPlayed) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .width(4.dp)
+                            .height(heightDp.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(barColor)
+                    )
+                }
+            }
+
+            // Controls & Progress
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                FilledIconButton(
+                    onClick = { isPlaying = !isPlaying },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play"
+                    )
+                }
+
+                Slider(
+                    value = currentPositionMs,
+                    onValueChange = {
+                        currentPositionMs = it
+                        mediaPlayer?.seekTo(it.toInt())
+                    },
+                    valueRange = 0f..totalDurationMs,
+                    modifier = Modifier.weight(1f)
+                )
+
+                val currentSec = (currentPositionMs / 1000).toInt()
+                val totalSec = (totalDurationMs / 1000).toInt()
+                Text(
+                    text = String.format(Locale.getDefault(), "%02d:%02d / %02d:%02d", currentSec / 60, currentSec % 60, totalSec / 60, totalSec % 60),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+private fun getOrCreateSampleAudioFile(context: Context): File {
+    val file = File(context.cacheDir, "sample_dossier_briefing.wav")
+    if (file.exists() && file.length() > 0) return file
+
+    try {
+        val sampleRate = 22050
+        val durationSeconds = 30
+        val numSamples = sampleRate * durationSeconds
+        val pcmData = ByteArray(numSamples * 2)
+
+        for (i in 0 until numSamples) {
+            val t = i.toDouble() / sampleRate
+            val angle = 2.0 * Math.PI * 440.0 * t
+            val sample = (sin(angle) * 6000.0).toInt().toShort()
+            pcmData[i * 2] = (sample.toInt() and 0x00FF).toByte()
+            pcmData[i * 2 + 1] = ((sample.toInt() shr 8) and 0x00FF).toByte()
+        }
+
+        FileOutputStream(file).use { out ->
+            val totalDataLen = pcmData.size + 36
+            val byteRate = sampleRate * 2
+
+            out.write("RIFF".toByteArray())
+            out.write(intToByteArray(totalDataLen))
+            out.write("WAVE".toByteArray())
+            out.write("fmt ".toByteArray())
+            out.write(intToByteArray(16))
+            out.write(shortToByteArray(1.toShort()))
+            out.write(shortToByteArray(1.toShort()))
+            out.write(intToByteArray(sampleRate))
+            out.write(intToByteArray(byteRate))
+            out.write(shortToByteArray(2.toShort()))
+            out.write(shortToByteArray(16.toShort()))
+            out.write("data".toByteArray())
+            out.write(intToByteArray(pcmData.size))
+            out.write(pcmData)
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return file
+}
+
+private fun intToByteArray(value: Int): ByteArray {
+    return byteArrayOf(
+        (value and 0xFF).toByte(),
+        ((value shr 8) and 0xFF).toByte(),
+        ((value shr 16) and 0xFF).toByte(),
+        ((value shr 24) and 0xFF).toByte()
+    )
+}
+
+private fun shortToByteArray(value: Short): ByteArray {
+    return byteArrayOf(
+        (value.toInt() and 0xFF).toByte(),
+        ((value.toInt() shr 8) and 0xFF).toByte()
+    )
 }
 
 @Composable

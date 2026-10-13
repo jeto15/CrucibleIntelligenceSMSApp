@@ -12,6 +12,7 @@ import android.provider.Telephony
 import android.telephony.SmsManager
 import com.example.crucibleintelligencesmsapp.data.AppDatabase
 import com.example.crucibleintelligencesmsapp.data.EntityProfile
+import com.example.crucibleintelligencesmsapp.data.MediaAttachment
 import com.example.crucibleintelligencesmsapp.data.MessageRecord
 import com.example.crucibleintelligencesmsapp.receiver.SmsActions
 import kotlinx.coroutines.Dispatchers
@@ -49,7 +50,8 @@ data class SmsMessage(
     val timestamp: Long,
     val type: Int,
     val isIncoming: Boolean,
-    val status: SmsStatus = SmsStatus.NONE
+    val status: SmsStatus = SmsStatus.NONE,
+    val attachments: List<MediaAttachment> = emptyList()
 )
 
 fun mapTelephonyStatus(type: Int, rawStatus: Int): SmsStatus {

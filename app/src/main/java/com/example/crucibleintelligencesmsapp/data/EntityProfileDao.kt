@@ -4,12 +4,16 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface EntityProfileDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProfile(profile: EntityProfile): Long
+
+    @Update
+    suspend fun updateProfile(profile: EntityProfile)
 
     @Query("SELECT * FROM entity_profile WHERE id = :id")
     suspend fun getProfileById(id: Long): EntityProfile?
