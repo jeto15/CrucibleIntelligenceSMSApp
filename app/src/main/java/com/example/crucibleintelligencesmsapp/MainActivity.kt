@@ -47,17 +47,21 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        checkDefaultSmsApp()
-        if (!isDefaultSmsApp) {
-            requestDefaultSmsApp()
+        try {
+            checkDefaultSmsApp()
+            if (!isDefaultSmsApp) {
+                requestDefaultSmsApp()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
 
         setContent {
             CrucibleIntelligenceSMSAppTheme {
                 PermissionWrapper {
                     val backStack = remember { mutableStateListOf<Any>(InboxRoute) }
-                    val database = remember { AppDatabase.getDatabase(this@MainActivity) }
-                    val smsRepo = remember { SmsRepository(this@MainActivity, database) }
+                    val database = remember { AppDatabase.getDatabase(applicationContext) }
+                    val smsRepo = remember { SmsRepository(applicationContext, database) }
 
                     NavDisplay(
                         backStack = backStack,
@@ -114,13 +118,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkDefaultSmsApp() {
-        isDefaultSmsApp = DefaultSmsHelper.isDefaultSmsApp(this)
+        try {
+            isDefaultSmsApp = DefaultSmsHelper.isDefaultSmsApp(this)
+        } catch (e: Exception) {
+            isDefaultSmsApp = false
+        }
     }
 
     fun requestDefaultSmsApp() {
-        val intent = DefaultSmsHelper.createRequestDefaultSmsIntent(this)
-        if (intent != null) {
-            requestRoleLauncher.launch(intent)
+        try {
+            val intent = DefaultSmsHelper.createRequestDefaultSmsIntent(this)
+            if (intent != null) {
+                requestRoleLauncher.launch(intent)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }

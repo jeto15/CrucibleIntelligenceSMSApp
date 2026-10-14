@@ -10,5 +10,6 @@ data class EntityProfile(
     val name: String?,
     val phoneNumber: String,
     val normalizedNumber: String,
-    val notes: String? = null
+    val notes: String? = null,
+    val manualContext: String? = null
 )

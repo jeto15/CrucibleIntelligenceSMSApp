@@ -35,15 +35,23 @@ class ChatViewModel(
 
     fun markAsRead() {
         viewModelScope.launch(Dispatchers.IO) {
-            smsRepository.markAsRead(threadId, address)
+            try {
+                smsRepository.markAsRead(threadId, address)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     val profile: StateFlow<EntityProfile?> = flow {
-        val entityProfile = smsRepository.getOrCreateProfileForAddress(address)
-        if (entityProfile != null) {
-            emitAll(database.profileDao().observeProfileById(entityProfile.id))
-        } else {
+        try {
+            val entityProfile = smsRepository.getOrCreateProfileForAddress(address)
+            if (entityProfile != null) {
+                emitAll(database.profileDao().observeProfileById(entityProfile.id))
+            } else {
+                emit(null)
+            }
+        } catch (e: Exception) {
             emit(null)
         }
     }
@@ -92,24 +100,33 @@ class ChatViewModel(
         }
 
         viewModelScope.launch(Dispatchers.IO) {
-            smsRepository.sendMessage(address, textToSend)
-            markAsRead()
+            try {
+                smsRepository.sendMessage(address, textToSend)
+                markAsRead()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun saveProfileNotes(notes: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            val currentProfile = profile.value
-            if (currentProfile != null) {
-                database.profileDao().updateProfile(currentProfile.copy(notes = notes))
-            } else {
-                val newProfile = EntityProfile(
-                    name = initialTitle.ifBlank { null },
-                    phoneNumber = address,
-                    normalizedNumber = address.replace(Regex("[^0-9+]"), ""),
-                    notes = notes
-                )
-                database.profileDao().insertProfile(newProfile)
+            try {
+                val currentProfile = profile.value
+                if (currentProfile != null) {
+                    database.profileDao().updateProfile(currentProfile.copy(notes = notes, manualContext = notes))
+                } else {
+                    val newProfile = EntityProfile(
+                        name = initialTitle.ifBlank { null },
+                        phoneNumber = address,
+                        normalizedNumber = address.replace(Regex("[^0-9+]"), ""),
+                        notes = notes,
+                        manualContext = notes
+                    )
+                    database.profileDao().insertProfile(newProfile)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }

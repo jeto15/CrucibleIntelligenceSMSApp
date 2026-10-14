@@ -445,7 +445,7 @@ fun DossierIntelligenceBottomSheet(
                 letterSpacing = 1.sp
             )
 
-            var manualNotes by remember(profile) { mutableStateOf(profile?.notes ?: "") }
+            var manualNotes by remember(profile) { mutableStateOf(profile?.manualContext ?: profile?.notes ?: "") }
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -805,10 +805,18 @@ fun DossierVoiceNotePlayer(context: Context) {
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
 
     DisposableEffect(context) {
-        val audioFile = getOrCreateSampleAudioFile(context)
+        val audioFile = try {
+            getOrCreateSampleAudioFile(context)
+        } catch (e: Exception) {
+            null
+        }
         val player = try {
-            MediaPlayer.create(context, Uri.fromFile(audioFile))?.apply {
-                isLooping = true
+            if (audioFile != null && audioFile.exists()) {
+                MediaPlayer.create(context, Uri.fromFile(audioFile))?.apply {
+                    isLooping = true
+                }
+            } else {
+                null
             }
         } catch (e: Exception) {
             null
@@ -816,20 +824,38 @@ fun DossierVoiceNotePlayer(context: Context) {
         mediaPlayer = player
 
         onDispose {
-            player?.stop()
-            player?.release()
+            try {
+                player?.stop()
+            } catch (e: Exception) {
+                // Ignore
+            }
+            try {
+                player?.release()
+            } catch (e: Exception) {
+                // Ignore
+            }
         }
     }
 
     LaunchedEffect(isPlaying) {
         if (isPlaying) {
-            mediaPlayer?.start()
+            try {
+                mediaPlayer?.start()
+            } catch (e: Exception) {
+                isPlaying = false
+            }
             while (isActive && isPlaying) {
                 delay(100)
                 currentPositionMs = (currentPositionMs + 100f) % totalDurationMs
             }
         } else {
-            mediaPlayer?.pause()
+            try {
+                if (mediaPlayer?.isPlaying == true) {
+                    mediaPlayer?.pause()
+                }
+            } catch (e: Exception) {
+                // Ignore
+            }
         }
     }
 
@@ -934,7 +960,11 @@ fun DossierVoiceNotePlayer(context: Context) {
                     value = currentPositionMs,
                     onValueChange = {
                         currentPositionMs = it
-                        mediaPlayer?.seekTo(it.toInt())
+                        try {
+                            mediaPlayer?.seekTo(it.toInt())
+                        } catch (e: Exception) {
+                            // Ignore
+                        }
                     },
                     valueRange = 0f..totalDurationMs,
                     modifier = Modifier.weight(1f)

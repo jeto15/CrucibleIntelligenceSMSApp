@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [EntityProfile::class, MessageRecord::class], version = 2, exportSchema = false)
+@Database(entities = [EntityProfile::class, MessageRecord::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun profileDao(): EntityProfileDao
     abstract fun messageDao(): MessageRecordDao
@@ -22,6 +22,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "crucible_sms_database"
                 )
                     .fallbackToDestructiveMigration(dropAllTables = true)
+                    .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
                     .build()
                 INSTANCE = instance
                 instance
