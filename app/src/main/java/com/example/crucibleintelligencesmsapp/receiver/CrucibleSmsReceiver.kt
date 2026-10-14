@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
+import android.util.Log
 import com.example.crucibleintelligencesmsapp.data.AppDatabase
 import com.example.crucibleintelligencesmsapp.data.EntityProfile
 import com.example.crucibleintelligencesmsapp.data.MessageRecord
@@ -14,16 +15,29 @@ import kotlinx.coroutines.launch
 
 class CrucibleSmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION && intent.action != Telephony.Sms.Intents.SMS_DELIVER_ACTION) return
+        val action = intent.action
+        if ((action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) &&
+            (action != Telephony.Sms.Intents.SMS_DELIVER_ACTION)
+        ) {
+            return
+        }
+
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-                if (messages.isEmpty()) return@launch
+                val messages = try {
+                    Telephony.Sms.Intents.getMessagesFromIntent(intent)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error extracting SMS messages from intent", e)
+                    null
+                }
 
-                val address = messages[0].displayOriginatingAddress ?: return@launch
-                val body = messages.joinToString("") { it.displayMessageBody ?: "" }
-                val timestamp = messages[0].timestampMillis
+                if (messages.isNullOrEmpty()) return@launch
+
+                val firstMessage = messages[0] ?: return@launch
+                val address = firstMessage.displayOriginatingAddress ?: return@launch
+                val body = messages.joinToString("") { it?.displayMessageBody ?: "" }
+                val timestamp = firstMessage.timestampMillis
 
                 val normalized = address.replace(Regex("[^0-9+]"), "")
 
@@ -37,20 +51,20 @@ class CrucibleSmsReceiver : BroadcastReceiver() {
                         EntityProfile(
                             name = null,
                             phoneNumber = address,
-                            normalizedNumber = normalized
-                        )
+                            normalizedNumber = normalized,
+                        ),
                     )
                     profile = profileDao.getProfileById(id)
                 }
 
-                if (profile != null) {
+                profile?.let { prof ->
                     messageDao.insertMessage(
                         MessageRecord(
-                            entityId = profile.id,
+                            entityId = prof.id,
                             content = body,
                             timestamp = timestamp,
-                            isIncoming = true
-                        )
+                            isIncoming = true,
+                        ),
                     )
                 }
 
@@ -58,6 +72,7 @@ class CrucibleSmsReceiver : BroadcastReceiver() {
                 val threadId = try {
                     Telephony.Threads.getOrCreateThreadId(context, address)
                 } catch (e: Exception) {
+                    Log.e(TAG, "Error getting thread ID for $address", e)
                     0L
                 }
 
@@ -71,12 +86,23 @@ class CrucibleSmsReceiver : BroadcastReceiver() {
                     put(Telephony.Sms.READ, 0)
                     put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_INBOX)
                 }
-                context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values)
-                context.contentResolver.notifyChange(Telephony.Sms.CONTENT_URI, null)
 
+                try {
+                    context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values)
+                    context.contentResolver.notifyChange(Telephony.Sms.CONTENT_URI, null)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error inserting SMS into ContentResolver", e)
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing incoming SMS broadcast", e)
             } finally {
                 pendingResult.finish()
             }
         }
+    }
+
+    companion object {
+        private const val TAG = "CrucibleSmsReceiver"
     }
 }

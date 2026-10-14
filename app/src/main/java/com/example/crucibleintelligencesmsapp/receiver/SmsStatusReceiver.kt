@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Telephony
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -23,7 +24,12 @@ class SmsStatusReceiver : BroadcastReceiver() {
         val smsUriString = intent.getStringExtra(SmsActions.EXTRA_SMS_URI)
         if (smsUriString.isNullOrBlank()) return
 
-        val smsUri = Uri.parse(smsUriString)
+        val smsUri = try {
+            Uri.parse(smsUriString)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing SMS URI: $smsUriString", e)
+            return
+        }
         val resultCode = resultCode
 
         val pendingResult = goAsync()
@@ -41,12 +47,12 @@ class SmsStatusReceiver : BroadcastReceiver() {
                         try {
                             context.contentResolver.update(smsUri, values, null, null)
                         } catch (e: Exception) {
-                            e.printStackTrace()
+                            Log.e(TAG, "Error updating sent SMS status", e)
                         }
                         try {
                             context.contentResolver.notifyChange(Telephony.Sms.CONTENT_URI, null)
                         } catch (e: Exception) {
-                            e.printStackTrace()
+                            Log.e(TAG, "Error notifying change on sent SMS", e)
                         }
                     }
                     SmsActions.ACTION_SMS_DELIVERED -> {
@@ -60,18 +66,24 @@ class SmsStatusReceiver : BroadcastReceiver() {
                         try {
                             context.contentResolver.update(smsUri, values, null, null)
                         } catch (e: Exception) {
-                            e.printStackTrace()
+                            Log.e(TAG, "Error updating delivered SMS status", e)
                         }
                         try {
                             context.contentResolver.notifyChange(Telephony.Sms.CONTENT_URI, null)
                         } catch (e: Exception) {
-                            e.printStackTrace()
+                            Log.e(TAG, "Error notifying change on delivered SMS", e)
                         }
                     }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in SmsStatusReceiver coroutine", e)
             } finally {
                 pendingResult.finish()
             }
         }
+    }
+
+    companion object {
+        private const val TAG = "SmsStatusReceiver"
     }
 }
