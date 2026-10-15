@@ -1,5 +1,7 @@
 package org.fossify.messages.ui
 
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -30,6 +33,7 @@ fun ConversationScreen(
     onSendMessage: (String) -> Unit = {},
     onSaveConfig: (ThreadConfiguration) -> Unit = {}
 ) {
+    val context = LocalContext.current
     var messageText by remember { mutableStateOf("") }
     var showDossierSheet by remember { mutableStateOf(value = false) }
     var threadConfig by remember { mutableStateOf(initialConfig) }
@@ -64,6 +68,8 @@ fun ConversationScreen(
                 actions = {
                     IconButton(
                         onClick = {
+                            Log.d("ConversationScreen", "Crucible Dossier icon clicked for threadId=$threadId")
+                            Toast.makeText(context, "Opening Crucible Intelligence Dossier...", Toast.LENGTH_SHORT).show()
                             showDossierSheet = true
                         }
                     ) {

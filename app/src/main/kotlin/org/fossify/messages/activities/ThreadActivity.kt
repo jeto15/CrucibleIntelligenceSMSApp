@@ -25,6 +25,7 @@ import android.text.format.DateUtils
 import android.text.format.DateUtils.FORMAT_NO_YEAR
 import android.text.format.DateUtils.FORMAT_SHOW_DATE
 import android.text.format.DateUtils.FORMAT_SHOW_TIME
+import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.KeyEvent
@@ -390,6 +391,14 @@ class ThreadActivity : SimpleActivity() {
         }
     }
 
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return if (handleMenuItemAction(item)) {
+            true
+        } else {
+            super.onOptionsItemSelected(item)
+        }
+    }
+
     private fun handleMenuItemAction(menuItem: MenuItem): Boolean {
         when (menuItem.itemId) {
             R.id.crucible_dossier -> openCrucibleDossierDrawer()
@@ -412,6 +421,8 @@ class ThreadActivity : SimpleActivity() {
     }
 
     private fun openCrucibleDossierDrawer() {
+        Log.d("ThreadActivity", "Crucible Dossier icon clicked for threadId=$threadId")
+        toast("Opening Crucible Intelligence Dossier...")
         hideKeyboard()
         ensureBackgroundThread {
             val config = threadConfigurationsDB.getConfiguration(threadId)
@@ -419,6 +430,7 @@ class ThreadActivity : SimpleActivity() {
             val phone = conversation?.phoneNumber ?: participants.firstOrNull()?.phoneNumbers?.firstOrNull()?.value ?: ""
 
             runOnUiThread {
+                if (isDestroyed || isFinishing) return@runOnUiThread
                 CrucibleDossierDialog(
                     activity = this,
                     threadId = threadId,
@@ -430,7 +442,9 @@ class ThreadActivity : SimpleActivity() {
                         ensureBackgroundThread {
                             threadConfigurationsDB.insertOrUpdate(newConfig)
                             runOnUiThread {
-                                setupThreadTitle()
+                                if (!isDestroyed && !isFinishing) {
+                                    setupThreadTitle()
+                                }
                             }
                         }
                     },
