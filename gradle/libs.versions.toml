@@ -7,7 +7,7 @@ ksp = "2.3.12"
 #Detekt
 detekt = "1.23.8"
 detektCompose = "0.4.28"
-composeBom = "2024.09.00"
+composeBom = "2026.09.00"
 generativeai = "0.9.0"
 #AndroidX
 androidx-constraintlayout = "2.2.2"
