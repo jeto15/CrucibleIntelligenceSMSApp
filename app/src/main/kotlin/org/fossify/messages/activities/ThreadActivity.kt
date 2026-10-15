@@ -385,9 +385,6 @@ class ThreadActivity : SimpleActivity() {
     }
 
     private fun setupOptionsMenu() {
-        binding.threadToolbar.setOnClickListener {
-            openCrucibleDossierDrawer()
-        }
         binding.threadToolbar.setOnMenuItemClickListener { menuItem ->
             handleMenuItemAction(menuItem)
         }

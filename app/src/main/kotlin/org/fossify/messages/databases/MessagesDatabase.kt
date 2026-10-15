@@ -33,7 +33,7 @@ import org.fossify.messages.models.ThreadConfiguration
         Draft::class,
         ThreadConfiguration::class
     ],
-    version = 12
+    version = 13
 )
 @TypeConverters(Converters::class)
 abstract class MessagesDatabase : RoomDatabase() {
@@ -74,6 +74,7 @@ abstract class MessagesDatabase : RoomDatabase() {
                             .addMigrations(MIGRATION_9_10)
                             .addMigrations(MIGRATION_10_11)
                             .addMigrations(MIGRATION_11_12)
+                            .addMigrations(MIGRATION_12_13)
                             .build()
                     }
                 }
@@ -194,8 +195,15 @@ abstract class MessagesDatabase : RoomDatabase() {
                         "`dossier_report_json` TEXT, " +
                         "`prompt_token_count` INTEGER NOT NULL DEFAULT 0, " +
                         "`candidates_token_count` INTEGER NOT NULL DEFAULT 0, " +
+                        "`manual_notes` TEXT, " +
                         "`updated_timestamp` INTEGER NOT NULL DEFAULT 0)"
                 )
+            }
+        }
+
+        private val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `thread_configurations` ADD COLUMN `manual_notes` TEXT")
             }
         }
     }

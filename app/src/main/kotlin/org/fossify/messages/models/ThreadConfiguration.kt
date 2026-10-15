@@ -34,6 +34,9 @@ data class ThreadConfiguration(
     @ColumnInfo(name = "candidates_token_count")
     val candidatesTokenCount: Int = 0,
 
+    @ColumnInfo(name = "manual_notes")
+    val manualNotes: String? = null,
+
     @ColumnInfo(name = "updated_timestamp")
     val updatedTimestamp: Long = System.currentTimeMillis()
 )
