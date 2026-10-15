@@ -1,6 +1,5 @@
 package org.fossify.messages.dialogs
 
-import android.app.Activity
 import android.util.Log
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -10,12 +9,16 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import com.google.android.material.R
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import androidx.activity.ComponentActivity
 import org.fossify.messages.models.Message
 import org.fossify.messages.models.ThreadConfiguration
 import org.fossify.messages.ui.CrucibleDossierBottomSheet
 
 class CrucibleDossierDialog(
-    private val activity: Activity,
+    private val activity: ComponentActivity,
     private val threadId: Long,
     private val displayTitle: String,
     private val phoneNumber: String,
@@ -36,6 +39,9 @@ class CrucibleDossierDialog(
             dialog = BottomSheetDialog(activity).apply {
                 val composeView = ComposeView(activity).apply {
                     setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+                    setViewTreeLifecycleOwner(activity)
+                    setViewTreeViewModelStoreOwner(activity)
+                    setViewTreeSavedStateRegistryOwner(activity)
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT
