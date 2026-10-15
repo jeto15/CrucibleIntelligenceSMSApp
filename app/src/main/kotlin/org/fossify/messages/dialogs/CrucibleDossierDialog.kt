@@ -1,6 +1,7 @@
 package org.fossify.messages.dialogs
 
 import android.app.Activity
+import android.util.Log
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.material3.MaterialTheme
@@ -26,52 +27,77 @@ class CrucibleDossierDialog(
     private var dialog: BottomSheetDialog? = null
 
     fun show() {
-        dialog = BottomSheetDialog(activity).apply {
-            val composeView = ComposeView(activity).apply {
-                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-                setContent {
-                    MaterialTheme {
-                        CrucibleDossierBottomSheet(
-                            threadId = threadId,
-                            displayTitle = displayTitle,
-                            phoneNumber = phoneNumber,
-                            messages = messages,
-                            initialConfig = initialConfig,
-                            onSaveConfig = { config ->
-                                onSaveConfig(config)
-                            },
-                            onDismiss = {
-                                dismiss()
-                            },
-                            onInjectScript = { script ->
-                                onInjectScript?.invoke(script)
-                            }
-                        )
+        if (activity.isFinishing || activity.isDestroyed) {
+            Log.w("CrucibleDossierDialog", "Activity is finishing or destroyed, skipping show()")
+            return
+        }
+
+        try {
+            dialog = BottomSheetDialog(activity).apply {
+                val composeView = ComposeView(activity).apply {
+                    setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
+                    setContent {
+                        MaterialTheme {
+                            CrucibleDossierBottomSheet(
+                                threadId = threadId,
+                                displayTitle = displayTitle,
+                                phoneNumber = phoneNumber,
+                                messages = messages,
+                                initialConfig = initialConfig,
+                                onSaveConfig = { config ->
+                                    try {
+                                        onSaveConfig(config)
+                                    } catch (e: Exception) {
+                                        Log.e("CrucibleDossierDialog", "Error saving config", e)
+                                    }
+                                },
+                                onDismiss = {
+                                    try {
+                                        dismiss()
+                                    } catch (e: Exception) {
+                                        Log.e("CrucibleDossierDialog", "Error dismissing dialog", e)
+                                    }
+                                },
+                                onInjectScript = { script ->
+                                    try {
+                                        onInjectScript?.invoke(script)
+                                    } catch (e: Exception) {
+                                        Log.e("CrucibleDossierDialog", "Error injecting script", e)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+                setContentView(composeView)
+                setOnShowListener {
+                    try {
+                        val bottomSheet = findViewById<FrameLayout>(R.id.design_bottom_sheet)
+                        bottomSheet?.let { sheet ->
+                            val behavior = BottomSheetBehavior.from(sheet)
+                            val displayMetrics = activity.resources.displayMetrics
+                            val maxHeight = (displayMetrics.heightPixels * 0.88).toInt()
+
+                            val layoutParams = sheet.layoutParams
+                            layoutParams.height = maxHeight
+                            sheet.layoutParams = layoutParams
+
+                            behavior.peekHeight = maxHeight
+                            behavior.state = BottomSheetBehavior.STATE_EXPANDED
+                            behavior.skipCollapsed = true
+                        }
+                    } catch (e: Exception) {
+                        Log.e("CrucibleDossierDialog", "Error setting up bottom sheet behavior on show", e)
                     }
                 }
             }
-            setContentView(composeView)
-            setOnShowListener {
-                val bottomSheet = findViewById<FrameLayout>(R.id.design_bottom_sheet)
-                bottomSheet?.let { sheet ->
-                    val behavior = BottomSheetBehavior.from(sheet)
-                    val displayMetrics = activity.resources.displayMetrics
-                    val maxHeight = (displayMetrics.heightPixels * 0.88).toInt()
-                    
-                    val layoutParams = sheet.layoutParams
-                    layoutParams.height = maxHeight
-                    sheet.layoutParams = layoutParams
-
-                    behavior.peekHeight = maxHeight
-                    behavior.state = BottomSheetBehavior.STATE_EXPANDED
-                    behavior.skipCollapsed = true
-                }
-            }
+            dialog?.show()
+        } catch (e: Exception) {
+            Log.e("CrucibleDossierDialog", "Error showing CrucibleDossierDialog", e)
         }
-        dialog?.show()
     }
 }

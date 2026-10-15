@@ -392,6 +392,10 @@ class ThreadActivity : SimpleActivity() {
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == R.id.crucible_dossier) {
+            openCrucibleDossierDrawer()
+            return true
+        }
         return if (handleMenuItemAction(item)) {
             true
         } else {
@@ -401,7 +405,10 @@ class ThreadActivity : SimpleActivity() {
 
     private fun handleMenuItemAction(menuItem: MenuItem): Boolean {
         when (menuItem.itemId) {
-            R.id.crucible_dossier -> openCrucibleDossierDrawer()
+            R.id.crucible_dossier -> {
+                openCrucibleDossierDrawer()
+                return true
+            }
             R.id.block_number -> blockNumber()
             R.id.delete -> askConfirmDelete()
             R.id.restore -> askConfirmRestoreAll()
@@ -422,40 +429,60 @@ class ThreadActivity : SimpleActivity() {
 
     private fun openCrucibleDossierDrawer() {
         Log.d("ThreadActivity", "Crucible Dossier icon clicked for threadId=$threadId")
-        toast("Opening Crucible Intelligence Dossier...")
-        hideKeyboard()
-        ensureBackgroundThread {
-            val config = threadConfigurationsDB.getConfiguration(threadId)
-            val title = conversation?.title ?: participants.firstOrNull()?.name ?: "Unknown"
-            val phone = conversation?.phoneNumber ?: participants.firstOrNull()?.phoneNumbers?.firstOrNull()?.value ?: ""
+        try {
+            toast("Opening Crucible Intelligence Dossier...")
+            hideKeyboard()
+            ensureBackgroundThread {
+                try {
+                    val config = threadConfigurationsDB.getConfiguration(threadId)
+                    val title = conversation?.title ?: participants.firstOrNull()?.name ?: "Unknown"
+                    val phone = conversation?.phoneNumber ?: participants.firstOrNull()?.phoneNumbers?.firstOrNull()?.value ?: ""
 
-            runOnUiThread {
-                if (isDestroyed || isFinishing) return@runOnUiThread
-                CrucibleDossierDialog(
-                    activity = this,
-                    threadId = threadId,
-                    displayTitle = title,
-                    phoneNumber = phone,
-                    messages = messages,
-                    initialConfig = config,
-                    onSaveConfig = { newConfig ->
-                        ensureBackgroundThread {
-                            threadConfigurationsDB.insertOrUpdate(newConfig)
-                            runOnUiThread {
-                                if (!isDestroyed && !isFinishing) {
-                                    setupThreadTitle()
+                    runOnUiThread {
+                        if (isDestroyed || isFinishing) return@runOnUiThread
+                        try {
+                            CrucibleDossierDialog(
+                                activity = this,
+                                threadId = threadId,
+                                displayTitle = title,
+                                phoneNumber = phone,
+                                messages = messages,
+                                initialConfig = config,
+                                onSaveConfig = { newConfig ->
+                                    ensureBackgroundThread {
+                                        try {
+                                            threadConfigurationsDB.insertOrUpdate(newConfig)
+                                            runOnUiThread {
+                                                if (!isDestroyed && !isFinishing) {
+                                                    setupThreadTitle()
+                                                }
+                                            }
+                                        } catch (e: Exception) {
+                                            Log.e("ThreadActivity", "Error updating thread configuration", e)
+                                        }
+                                    }
+                                },
+                                onInjectScript = { script ->
+                                    try {
+                                        binding.messageHolder.threadTypeMessage.setText(script)
+                                        binding.messageHolder.threadTypeMessage.setSelection(script.length)
+                                        binding.messageHolder.threadTypeMessage.requestFocus()
+                                        showKeyboard(binding.messageHolder.threadTypeMessage)
+                                    } catch (e: Exception) {
+                                        Log.e("ThreadActivity", "Error injecting script into message text", e)
+                                    }
                                 }
-                            }
+                            ).show()
+                        } catch (e: Exception) {
+                            Log.e("ThreadActivity", "Error showing CrucibleDossierDialog", e)
                         }
-                    },
-                    onInjectScript = { script ->
-                        binding.messageHolder.threadTypeMessage.setText(script)
-                        binding.messageHolder.threadTypeMessage.setSelection(script.length)
-                        binding.messageHolder.threadTypeMessage.requestFocus()
-                        showKeyboard(binding.messageHolder.threadTypeMessage)
                     }
-                ).show()
+                } catch (e: Exception) {
+                    Log.e("ThreadActivity", "Error fetching configuration for Crucible Dossier", e)
+                }
             }
+        } catch (e: Exception) {
+            Log.e("ThreadActivity", "Error in openCrucibleDossierDrawer", e)
         }
     }
 
